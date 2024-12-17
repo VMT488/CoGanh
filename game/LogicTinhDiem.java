@@ -3,30 +3,23 @@ package game;
 import java.awt.*;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Stack;
 
 public class LogicTinhDiem {
-	// Danh sách các nước đi bị cấm
-	private static final List<Point[]> DANH_SACH_CAM = List.of(
-	    new Point[]{new Point(0, 1), new Point(1, 2)},
-	    new Point[]{new Point(1, 2), new Point(0, 3)},
-	    new Point[]{new Point(0, 3), new Point(1, 4)},
-	    new Point[]{new Point(3, 0), new Point(4, 1)},
-	    new Point[]{new Point(0, 1), new Point(1, 0)},
-	    new Point[]{new Point(2, 1), new Point(1, 0)},
-	    new Point[]{new Point(2, 1), new Point(1, 2)},
-	    new Point[]{new Point(2, 3), new Point(1, 2)},
-	    new Point[]{new Point(2, 3), new Point(1, 4)},
-	    new Point[]{new Point(3, 0), new Point(2, 1)},
-	    new Point[]{new Point(2, 1), new Point(3, 2)},
-	    new Point[]{new Point(3, 2), new Point(2, 3)},
-	    new Point[]{new Point(3, 2), new Point(2, 4)},
-	    new Point[]{new Point(3, 2), new Point(4, 1)},
-	    new Point[]{new Point(3, 2), new Point(4, 3)},
-	    new Point[]{new Point(4, 3), new Point(3, 4)}
-	);
+	
+	private static final List<Point[]> DANH_SACH_CAM = List.of(new Point[] { new Point(0, 1), new Point(1, 2) },
+			new Point[] { new Point(1, 2), new Point(0, 3) }, new Point[] { new Point(0, 3), new Point(1, 4) },
+			new Point[] { new Point(3, 0), new Point(4, 1) }, new Point[] { new Point(0, 1), new Point(1, 0) },
+			new Point[] { new Point(2, 1), new Point(1, 0) }, new Point[] { new Point(2, 1), new Point(1, 2) },
+			new Point[] { new Point(2, 3), new Point(1, 2) }, new Point[] { new Point(2, 3), new Point(1, 4) },
+			new Point[] { new Point(3, 0), new Point(2, 1) }, new Point[] { new Point(2, 1), new Point(3, 2) },
+			new Point[] { new Point(3, 2), new Point(2, 3) }, new Point[] { new Point(3, 2), new Point(2, 4) },
+			new Point[] { new Point(3, 2), new Point(4, 1) }, new Point[] { new Point(3, 2), new Point(4, 3) },
+			new Point[] { new Point(4, 3), new Point(3, 4) });
+	private Stack<NuocDi> lichSuNuocDi = new Stack<>();
 
 	// Ham tinh diem
-	public int hueristic(QuanCo[][] banCo, boolean minimax) {
+	public int heuristic(QuanCo[][] banCo, boolean minimax) {
 		int quanDo = 0, quanXanh = 0;
 		int kichThuocBanCo = banCo.length;
 
@@ -74,21 +67,21 @@ public class LogicTinhDiem {
 
 	// Ham minimax
 	public int minimax(QuanCo[][] state, int depth, int alpha, int beta, boolean minmax) {
-		if (depth == 0 || isGameOver(state)) {
-			return hueristic(state, minmax);
+		if (depth == 0 || gameOver(state)) {
+			return heuristic(state, minmax);
 		}
 
-		List<Move> danhSachNuocDi = taoNuocDiChoAI(state, minmax ? Color.RED : Color.BLUE);
+		List<NuocDi> danhSachNuocDi = taoNuocDiChoAI(state, minmax ? Color.RED : Color.BLUE);
 
 		if (danhSachNuocDi.isEmpty())
-			return hueristic(state, minmax);
+			return heuristic(state, minmax);
 
 		if (minmax) {
 			int temp = Integer.MIN_VALUE;
-			for (Move move : danhSachNuocDi) {
-				applyMove(state, move);
+			for (NuocDi move : danhSachNuocDi) {
+				thucHienDiChuyen(state, move); // tao ban co moi 
 				int tinhDiem = minimax(state, depth - 1, alpha, beta, false); // Tinh dien cho state moi
-				undoMove(state, move);
+				hoanTac(state, move);
 				temp = Math.max(temp, tinhDiem);
 				alpha = Math.max(alpha, tinhDiem); // Cap nhat gia tri lon nhat
 				if (beta <= alpha)
@@ -97,10 +90,10 @@ public class LogicTinhDiem {
 			return temp;
 		} else {
 			int temp = Integer.MAX_VALUE;
-			for (Move move : danhSachNuocDi) {
-				applyMove(state, move);
+			for (NuocDi move : danhSachNuocDi) {
+				thucHienDiChuyen(state, move);
 				int tinhDiem = minimax(state, depth - 1, alpha, beta, true);
-				undoMove(state, move);
+				hoanTac(state, move);
 				temp = Math.min(temp, tinhDiem);
 				beta = Math.min(beta, tinhDiem); // Cap nhat gia tri lon nhat
 				if (beta <= alpha)
@@ -111,7 +104,7 @@ public class LogicTinhDiem {
 	}
 
 	// Kiem tra dieu kien ket thuc
-	public boolean isGameOver(QuanCo[][] banCo) {
+	public boolean gameOver(QuanCo[][] banCo) {
 		boolean quanDo = false, quanXanh = false;
 
 		for (QuanCo[] row : banCo) {
@@ -129,8 +122,8 @@ public class LogicTinhDiem {
 	}
 
 	// Ham tao nuoc di cho AI
-	public List<Move> taoNuocDiChoAI(QuanCo[][] banCo, Color mauQuanCoCuaAI) {
-		List<Move> danhSachNuocDi = new ArrayList<>(); // Luu tru danh sach nuoc di
+	public List<NuocDi> taoNuocDiChoAI(QuanCo[][] banCo, Color mauQuanCoCuaAI) {
+		List<NuocDi> danhSachNuocDi = new ArrayList<>(); // Luu tru danh sach nuoc di
 		// Duyet tung vi tri trong ban co
 		for (int row = 0; row < banCo.length; row++) {
 			for (int col = 0; col < banCo[row].length; col++) {
@@ -144,7 +137,7 @@ public class LogicTinhDiem {
 							// Vi tri sap di phai nam trong ban co va dang trong
 							if (newRow >= 0 && newRow < banCo.length && newCol >= 0 && newCol < banCo[row].length
 									&& banCo[newRow][newCol] == null) {
-								Move move = new Move(new Point(col, row), new Point(newCol, newRow));
+								NuocDi move = new NuocDi(new Point(col, row), new Point(newCol, newRow));
 								if (nuocDiHopLe(new Point(col, row), new Point(newCol, newRow))) {
 									danhSachNuocDi.add(move);
 								}
@@ -173,40 +166,39 @@ public class LogicTinhDiem {
 		double khoangCach = Math.abs(row - trungTamX) + Math.abs(col - trungTamY);
 
 		// Diem la 10 o trung tam giam dan khi ra xa
-		int diem = (int) Math.round(10 - khoangCach);
+		int diem = (int) Math.round(1 - khoangCach);
 
 		// Dam bao diem khong am
 		return Math.max(diem, 0);
 	}
 
 	// Ham danh gia muc do ho tro nuoc di
-	public int danhGiaQuanDongMinhLienKe(QuanCo[][] banCo, Move nuocDi) {
-		applyMove(banCo, nuocDi); // Di chuyen thu de kiem tra diem
+	public int danhGiaQuanDongMinhLienKe(QuanCo[][] banCo, NuocDi nuocDi) {
+		thucHienDiChuyen(banCo, nuocDi); // Di chuyen thu de kiem tra diem
 		int diem = tinhDiemKhiCoQuanDongMinhLienKe(banCo, nuocDi.to.y, nuocDi.to.x, Color.BLUE);
-		undoMove(banCo, nuocDi); // Hoan tac de giu nguyen ban co truoc do
+		hoanTac(banCo, nuocDi); // Hoan tac de giu nguyen ban co truoc do
 		return diem;
 	}
-
+	
 	// Thuc hien nuoc di
-	public void applyMove(QuanCo[][] banCo, Move nuocDi) {
+	public void thucHienDiChuyen(QuanCo[][] banCo, NuocDi nuocDi) {
+		lichSuNuocDi.add(nuocDi);
 		banCo[nuocDi.to.y][nuocDi.to.x] = banCo[nuocDi.from.y][nuocDi.from.x];
 		banCo[nuocDi.from.y][nuocDi.from.x] = null;
 	}
 
 	// Hoan tac nuoc di
-	public void undoMove(QuanCo[][] banCo, Move nuocDi) {
+	public void hoanTac(QuanCo[][] banCo, NuocDi nuocDi) {
 		banCo[nuocDi.from.y][nuocDi.from.x] = banCo[nuocDi.to.y][nuocDi.to.x];
 		banCo[nuocDi.to.y][nuocDi.to.x] = null;
 	}
 
-	// Kiem tra nuoc di co hop le khong
 	public boolean nuocDiHopLe(Point from, Point to) {
-		 for (Point[] cam : DANH_SACH_CAM) {
-		        if ((cam[0].equals(from) && cam[1].equals(to)) || (cam[1].equals(from) && cam[0].equals(to))) {
-		            return false; // Nước đi bị cấm
-		        }
-		    }
-		    return true; // Nước đi hợp lệ
+		for (Point[] cam : DANH_SACH_CAM) {
+			if ((cam[0].equals(from) && cam[1].equals(to)) || (cam[1].equals(from) && cam[0].equals(to))) {
+				return false; // Nước đi bị cấm
+			}
+		}
+		return true; // Nước đi hợp lệ
 	}
-
 }
